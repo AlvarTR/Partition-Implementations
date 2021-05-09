@@ -1,6 +1,6 @@
 
 # Haskell compilation files
+partitions
 *.hi
 *.o
 *.prof
-

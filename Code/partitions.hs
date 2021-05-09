@@ -20,6 +20,8 @@ import Control.Monad.Primitive
 import Control.Monad.ST
 --import Data.STRef
 
+--X-- import Control.Monad.LoopWhile
+
 
 matrixToString :: (Show a) => [a] -> String
 matrixToString [] = ""
@@ -357,7 +359,35 @@ onelinePartitions' n = head $ fst $ dpOnelinePartitions [] [] 0 0 n
       where
         value = currentValue + (headB !! (used-1))
 
+onelinePartitions'' :: Int -> Integer
+onelinePartitions'' n = last $ dpOnelinePartitions (replicate (n+1) 1) 2 n
+  where
+    dpOnelinePartitions :: [Integer] -> Int -> Int -> [Integer]
+    dpOnelinePartitions buffer used n
+      | used > n  = buffer
+      | otherwise = dpOnelinePartitions updated (used+1) n
+      where
+        --updated = zipWith (+) buffer (replicate used 0 ++ updated)
+        (alreadyComputed, rest) = splitAt used buffer
+        updated = alreadyComputed ++ zipWith (+) rest updated
 
+onelinePartitions''' :: Int -> Integer
+onelinePartitions''' n = head $ dpOnelinePartitions (replicate (n+1) 1) 2 n
+  where
+    dpOnelinePartitions :: [Integer] -> Int -> Int -> [Integer]
+    dpOnelinePartitions buffer used n
+      | used > n  = buffer
+      | otherwise = dpOnelinePartitions updated (used+1) n
+      where
+        --updated = zipWith (+) buffer (replicate used 0 ++ updated)
+        (rest, alreadyComputed) = splitAt (n+1-used) buffer
+        updated = updating rest alreadyComputed used
+
+        updating :: [Integer] -> [Integer] -> Int -> [Integer]
+        updating [] initial _ = initial
+        updating (first:rest) initial used =
+          let buffer = updating rest initial used
+          in ( first + (buffer !! (used-1)) ) : buffer
 
 accumulatorPartitions :: Int -> Integer
 accumulatorPartitions = head . accumImplementation [] 0
@@ -844,10 +874,65 @@ pentaUpdateVectorFromTheBottomPartitions n = V.last $ vectorPentagonal pentagona
           plusMinus = cycle [id, id, negate, negate]
           value = sum $ zipWith id plusMinus dp
 
+
+samelinePartitions :: Int -> Integer
+samelinePartitions n = runST $ do
+    storage <- MV.replicate (n+1) (1 :: Integer)
+    dpSamelinePartitions storage 2 0 n
+    MV.read storage n
+  where
+    dpSamelinePartitions :: (PrimMonad m) =>
+                            MV.MVector (PrimState m) Integer ->
+                            Int -> Int -> Int -> m ()
+    dpSamelinePartitions storage used free n
+      | used > n    = return ()
+      | free > n    = dpSamelinePartitions storage (used+1) 0 n
+      | used > free = dpSamelinePartitions storage used used n --Shortcut
+      | otherwise   = do
+        addValue <- MV.read storage (free - used)
+        MV.modify storage ((+) addValue) free
+        dpSamelinePartitions storage used (free+1) n
+
+
+samelinePartitions' :: Int -> Integer
+samelinePartitions' n = runST $ do
+    storage <- MV.replicate (n+1) (1 :: Integer)
+    dpSamelinePartitions storage 2 2 n
+    MV.unsafeRead storage n
+  where
+    dpSamelinePartitions :: (PrimMonad m) =>
+                            MV.MVector (PrimState m) Integer ->
+                            Int -> Int -> Int -> m ()
+    dpSamelinePartitions storage used free n
+      | free > n  = if (used+1) > n
+                      then return ()
+                      else dpSamelinePartitions storage (used+1) (used+1) n
+      | otherwise = do
+        addValue <- MV.unsafeRead storage (free - used)
+        MV.unsafeModify storage ((+) addValue) free
+        dpSamelinePartitions storage used (free+1) n
+
+samelinePartitions'' :: Int -> Integer
+samelinePartitions'' n = runST $ do
+    storage <- MV.replicate (n+1) (1 :: Integer)
+    dpSamelinePartitions storage 2 n
+    MV.unsafeRead storage n
+  where
+    dpSamelinePartitions :: (PrimMonad m) =>
+                            MV.MVector (PrimState m) Integer ->
+                            Int -> Int -> m ()
+    dpSamelinePartitions storage used n
+      | used > n  = return ()
+      | otherwise = do
+        -- TODO implement a kind of zipWith
+        yetToCompute <- MV.drop used storage
+        MV.imapM_ yetToCompute (\ index _ -> MV.modify yetToCompute ((+) MV.read storage index) index ) 
+        dpSamelinePartitions storage (used+1) n
+
 main :: IO ()
 main = do
   -- A 45000 ya tira de swap, no jugarsela
-  let n = 10000
+  let n = 1500
   putStrLn $ (++) "n = " $ show n
 
 --  print [(headM, selected, tailM) | (headM, selected:tailM) <- [splitAt x [0..10] | x <- [0..10]]]
@@ -877,6 +962,10 @@ main = do
                   --pentagonalPartitions'',
                   --pentagonalPartitions',
                   --pentagonalPartitions,
+                  -- < 3000
+                  samelinePartitions'',
+                  --samelinePartitions',
+                  --samelinePartitions,
                   -- < 2500
                   --eulerPartitions'',
                   -- < 2000
@@ -885,9 +974,11 @@ main = do
                   -- < 1700
                   --accumulatorPartitions'',
                   --accumulatorPartitions',
-                  -- < 1600
-                  --onelinePartitions,
+                  -- < 1500
+                  --onelinePartitions'',
                   --onelinePartitions',
+                  --onelinePartitions,
+                  --onelinePartitions''',
                   -- <1300
                   --accumulatorPartitions,
                   -- <750
