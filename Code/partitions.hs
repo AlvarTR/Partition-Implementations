@@ -924,10 +924,23 @@ samelinePartitions'' n = runST $ do
     dpSamelinePartitions storage used n
       | used > n  = return ()
       | otherwise = do
-        -- TODO implement a kind of zipWith
-        yetToCompute <- MV.drop used storage
-        MV.imapM_ yetToCompute (\ index _ -> MV.modify yetToCompute ((+) MV.read storage index) index ) 
+        --MV.imapM_ yetToCompute ( \ index value -> MV.modify storage ((+) value) (index+used) )
+        computePartitions storage (n+1 -used) used n
         dpSamelinePartitions storage (used+1) n
+      where
+
+        computePartitions :: (PrimMonad m) =>
+                              MV.MVector (PrimState m) Integer ->
+                              Int -> Int -> Int -> m ()
+
+        computePartitions _ 0 _ _ = return ()
+        computePartitions storage counter used n =
+          let index = (n+1 - counter)
+          in do
+          value <- MV.unsafeRead storage (index -used)
+          MV.unsafeModify storage ((+) value) index
+          computePartitions storage (counter-1) used n
+
 
 main :: IO ()
 main = do
@@ -963,9 +976,9 @@ main = do
                   --pentagonalPartitions',
                   --pentagonalPartitions,
                   -- < 3000
+                  samelinePartitions',
                   samelinePartitions'',
-                  --samelinePartitions',
-                  --samelinePartitions,
+                  samelinePartitions,
                   -- < 2500
                   --eulerPartitions'',
                   -- < 2000
@@ -1003,7 +1016,7 @@ main = do
 
   let readyFunctions = zipWith (map) functions
 
---  return $! force $ readyFunctions $ cycle [[n]]
+  return $! force $ readyFunctions $ cycle [[n]]
 
 
 --  https://oeis.org/A000041
@@ -1011,8 +1024,8 @@ main = do
   let len = length correct
 
   let results = readyFunctions $ cycle [[0..len-1]]
-  print results
-  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) results $ cycle [correct]
+--  print results
+--  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) results $ cycle [correct]
 
   return ()
 
