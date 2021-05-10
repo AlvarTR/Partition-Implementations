@@ -928,7 +928,6 @@ samelinePartitions'' n = runST $ do
         computePartitions storage (n+1 -used) used n
         dpSamelinePartitions storage (used+1) n
       where
-
         computePartitions :: (PrimMonad m) =>
                               MV.MVector (PrimState m) Integer ->
                               Int -> Int -> Int -> m ()
@@ -976,9 +975,9 @@ main = do
                   --pentagonalPartitions',
                   --pentagonalPartitions,
                   -- < 3000
-                  samelinePartitions',
                   samelinePartitions'',
-                  samelinePartitions,
+                  --samelinePartitions',
+                  --samelinePartitions,
                   -- < 2500
                   --eulerPartitions'',
                   -- < 2000
@@ -1016,7 +1015,7 @@ main = do
 
   let readyFunctions = zipWith (map) functions
 
-  return $! force $ readyFunctions $ cycle [[n]]
+--  return $! force $ readyFunctions $ cycle [[n]]
 
 
 --  https://oeis.org/A000041
@@ -1024,8 +1023,8 @@ main = do
   let len = length correct
 
   let results = readyFunctions $ cycle [[0..len-1]]
---  print results
---  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) results $ cycle [correct]
+  print results
+  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) results $ cycle [correct]
 
   return ()
 

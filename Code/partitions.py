@@ -19,7 +19,8 @@ def p(n):
         return 0
     if pmem[n] != 0:
         return pmem[n]
-    sign = 1
+    signLoop = (operator.pos, operator.neg)
+    sign = signLoop[0] #sign = 1
     res = 0
     for k in range(1, n+1):
         p1 = n - (k*((3*k)-1)//2)
@@ -33,8 +34,8 @@ def p(n):
                 pmem[p2] = p(p2)
 
         term = p(p1) + p(p2)
-        res += sign*term
-        sign = -sign
+        res += sign(term) #res += sign*term
+        sign = signLoop[k%2] #sign = -sign
     return res
 
 
@@ -167,7 +168,7 @@ def numerosPentagonales (maxPent):
 
 
 def particionesPentaVector (n):
-    sumaOResta = [operator.pos,operator.pos,operator.neg,operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     particiones = [1]
 
     for subN in range(1, n+1):
@@ -182,7 +183,7 @@ def particionesPentaVector (n):
     return particiones[-1]
 
 def particionesPentaVectorActualizando (n):
-    sumaOResta = [operator.pos, operator.pos, operator.neg, operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     particiones = [1] * (n+1)
 
     for subN in range(1, n+1):
@@ -217,7 +218,7 @@ def indexNumOrLower(list, number):
     return middle
 
 def particionesPentaVectorOpt(n):
-    sumaOResta = [operator.pos, operator.pos, operator.neg, operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     pentagonales = list(numerosPentagonales(n))
     particiones = [1]
 
@@ -239,7 +240,7 @@ def particionesPentaVectorOpt(n):
     return particiones[-1]
 
 def particionesPentaVectorReOpt(n):
-    sumaOResta = [operator.pos, operator.pos, operator.neg, operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     pentagonales = list(enumerate(numerosPentagonales(n))) # Lista de nodos pentagonales (i, pent)
 
     particiones = [1] # particiones[0] = 1
@@ -271,7 +272,7 @@ def particionesPentaVectorGen(n): # Comparable a opt en tiempo, pero con menos c
         except StopIteration:
             return () # Si no hay mas, devuelve un nodo vacio = ()
 
-    sumaOResta = [operator.pos, operator.pos, operator.neg, operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     pentagonales = enumerate(numerosPentagonales(n)) # Generador de nodos pentagonales (i, pent)
     nextPentagonal = 0 # next(pentagonales) nunca sera 0; inicializacion
     nextPentagonal = nextNodo(pentagonales)
@@ -307,7 +308,7 @@ def particionesPentaVectorNodo(n): # Comparable a opt en tiempo, pero con menos 
         except StopIteration:
             return () # Si no hay mas, devuelve un nodo vacio = ()
 
-    sumaOResta = [operator.pos, operator.pos, operator.neg, operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     pentagonales = ( (sumaOResta[i%4], penta) for (i, penta) in enumerate(numerosPentagonales(n)) ) # Generador de nodos pentagonales (signo, pent)
 
     nextPentagonal = nextNodo(pentagonales) # Generamos el primer nodo pentagonal
@@ -351,7 +352,7 @@ def particionesPentaVectorParalelizable(n): # Comparable a opt en tiempo, pero c
         except StopIteration:
             return () # Si no hay mas, devuelve un nodo vacio = ()
 
-    sumaOResta = [operator.pos, operator.pos, operator.neg, operator.neg]
+    sumaOResta = (operator.pos, operator.pos, operator.neg, operator.neg)
     pentagonales = ( (sumaOResta[i%4], penta) for (i, penta) in enumerate(numerosPentagonales(n)) ) # Generador de nodos pentagonales (signo, pent)
 
     nextPentagonal = nextNodo(pentagonales) # Generamos el primer nodo pentagonal
@@ -383,6 +384,31 @@ def particionesPentaVectorParalelizable(n): # Comparable a opt en tiempo, pero c
 
     return particiones[-1] # Devuelve la ultima particion calculada, p(n)
 
+def particionesUnaLinea(n):
+    nPartition = 1
+    if n < 2:
+        return nPartition
+
+    dp = [1 for _ in range(n-1)]
+    for used in range(2, n+1):
+        for i in range(used, len(dp)):
+            dp[i] += dp[i-used]
+        nPartition += dp.pop()
+    return nPartition
+
+def particionesUnaLineaWhile(n):
+    nPartition = 1
+    if n < 2:
+        return nPartition
+
+    dp = [1]*(n-1)
+    used = 2
+    while used < len(dp):
+        for i in range(used, len(dp)):
+            dp[i] += dp[i-used]
+        nPartition += dp.pop()
+        used += 1
+    return nPartition + sum(dp)
 
 if __name__ == "__main__":
     #todasPartHastaLimite()
@@ -401,21 +427,21 @@ if __name__ == "__main__":
     #chrono = time.time()
     #valor = p(LIM)
     #print( "Ramanujan de", LIM, valor, time.time() - chrono )
-    for i in range(1, 11):
+    for i in range(1, 3):
         thisLim = i*LIM
 
-        #"""
+        """
         chrono = time.time()
         valor = particionesPentaVectorNodo(thisLim)
         print( "particionesPentaVectorNodo de", thisLim, valor, time.time() - chrono )
         print()
-        #"""
-        #"""
+        """
+        """
         chrono = time.time()
         valor = particionesPentaVectorParalelizable(thisLim)
         print( "particionesPentaVectorParalelizable de", thisLim, valor, time.time() - chrono )
         print()
-        #"""
+        """
         """
         chrono = time.time()
         valor = particionesPentaVectorReOpt(thisLim)
@@ -443,7 +469,20 @@ if __name__ == "__main__":
         """
         chrono = time.time()
         valor = particionesPentaVectorActualizando(thisLim)
-        print( "PentaVector de", thisLim, valor, time.time() - chrono )
+        print( "PentaVectorActualizando de", thisLim, valor, time.time() - chrono )
+        print()
+        """
+        # Tiempo O(n^2 / 4), Espacio O(n)
+        """
+        chrono = time.time()
+        valor = particionesUnaLinea(thisLim)
+        print( "particionesUnaLinea de", thisLim, valor, time.time() - chrono )
+        print()
+        """
+        """
+        chrono = time.time()
+        valor = particionesUnaLineaWhile(thisLim)
+        print( "particionesUnaLineaWhile de", thisLim, valor, time.time() - chrono )
         print()
         """
 
