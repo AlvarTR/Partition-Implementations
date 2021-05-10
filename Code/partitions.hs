@@ -846,7 +846,6 @@ pentaUpdateVectorPartitions'''' n = runST $ do
         vectorPentagonal storage pentagonal plusMinus (n-1)
         dp <- mapM (MV.read storage) lessThanN
         MV.write storage n (sum (zipWith id plusMinus dp) )
-
       where
         lessThanN = takeWhile (>=0) $ map ((-) n) pentagonal
 
@@ -866,13 +865,13 @@ pentaUpdateVectorFromTheBottomPartitions n = V.last $ vectorPentagonal pentagona
     vectorPentagonal :: [Int] -> Int -> Int -> V.Vector Integer
     vectorPentagonal _ 0 maxN = V.singleton 1 V.++ V.replicate maxN 0
     vectorPentagonal pentagonal n maxN = V.update buffer $ V.fromList[(n, value)]
-        where
-          buffer = vectorPentagonal pentagonal (n-1) maxN
-          lessThanN = map ((-) n) $ takeWhile (<=n) pentagonal
-          dp = map ((V.!) buffer) lessThanN
+      where
+        buffer = vectorPentagonal pentagonal (n-1) maxN
+        lessThanN = map ((-) n) $ takeWhile (<=n) pentagonal
+        dp = map ((V.!) buffer) lessThanN
 
-          plusMinus = cycle [id, id, negate, negate]
-          value = sum $ zipWith id plusMinus dp
+        plusMinus = cycle [id, id, negate, negate]
+        value = sum $ zipWith id plusMinus dp
 
 
 samelinePartitions :: Int -> Integer
@@ -892,7 +891,6 @@ samelinePartitions n = runST $ do
         addValue <- MV.read storage (free - used)
         MV.modify storage ((+) addValue) free
         dpSamelinePartitions storage used (free+1) n
-
 
 samelinePartitions' :: Int -> Integer
 samelinePartitions' n = runST $ do
@@ -931,14 +929,38 @@ samelinePartitions'' n = runST $ do
         computePartitions :: (PrimMonad m) =>
                               MV.MVector (PrimState m) Integer ->
                               Int -> Int -> Int -> m ()
-
         computePartitions _ 0 _ _ = return ()
-        computePartitions storage counter used n =
+        computePartitions storage counter used n = do
           let index = (n+1 - counter)
-          in do
           value <- MV.unsafeRead storage (index -used)
           MV.unsafeModify storage ((+) value) index
           computePartitions storage (counter-1) used n
+
+samelinePartitions''' :: Int -> Integer
+samelinePartitions''' n = runST $ do
+    storage <- MV.replicate (n+1) (1 :: Integer)
+    dpSamelinePartitions storage 2 n
+    MV.unsafeRead storage n
+  where
+    dpSamelinePartitions :: (PrimMonad m) =>
+                            MV.MVector (PrimState m) Integer ->
+                            Int -> Int -> m ()
+    dpSamelinePartitions storage used n
+      | used > n  = return ()
+      | otherwise = do
+        forI_ (n+1) ( \ index -> do
+          addingValue <- MV.unsafeRead storage (index-used)
+          MV.unsafeModify storage ( (+) addingValue ) index ) used
+        dpSamelinePartitions storage (used+1) n
+      where -- Adapting from source-code version 0.12.3.0
+        forI_ :: (PrimMonad m) => Int -> (Int -> m ()) -> Int -> m ()
+        forI_ n f = loop
+          where
+            loop i  | i >= n    = return ()
+                    | otherwise = f i >> loop (i + 1)
+        --imapM_ :: (PrimMonad m) => (Int -> m ()) -> MV.MVector (PrimState m) Integer -> Int -> m ()
+        --imapM_ f v = forI_ v (\ i -> f i)
+
 
 
 main :: IO ()
@@ -954,7 +976,7 @@ main = do
 
   let functions = init $ tail [ (\ x -> 0),
                   -- < 30000 para ejecuciones que tarden menos de 10s
-                  --pentaUpdateVectorPartitions'''',
+                  --X--pentaUpdateVectorPartitions'''',
                   -- < 25000
                   --pentaVectorPartitions',
                   --pentaVectorPartitions,
@@ -975,8 +997,9 @@ main = do
                   --pentagonalPartitions',
                   --pentagonalPartitions,
                   -- < 3000
-                  samelinePartitions'',
+                  --samelinePartitions'',
                   --samelinePartitions',
+                  samelinePartitions''',
                   --samelinePartitions,
                   -- < 2500
                   --eulerPartitions'',
@@ -1015,7 +1038,7 @@ main = do
 
   let readyFunctions = zipWith (map) functions
 
---  return $! force $ readyFunctions $ cycle [[n]]
+  return $! force $ readyFunctions $ cycle [[n]]
 
 
 --  https://oeis.org/A000041
