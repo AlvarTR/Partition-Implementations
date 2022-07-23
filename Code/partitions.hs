@@ -877,9 +877,8 @@ pentaUpdateVectorPartitions''''' n = runST $ do
 
 pentaUpdateVectorPartitions'''''' :: Int -> Integer
 pentaUpdateVectorPartitions'''''' n = runST $ do
-    storage <- MV.replicate (n+1) (1 :: Integer)
+    storage <- MV.new n
     vectorPentagonal storage pentagonal plusMinus n
-    MV.read storage n
   where
     sqrtN = ceiling $ sqrt $ fromIntegral n
     posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..sqrtN] posPentagonal]
@@ -892,20 +891,22 @@ pentaUpdateVectorPartitions'''''' n = runST $ do
                         [Int] ->
                         [Integer -> Integer] ->
                         Int ->
-                        m ()
+                        m (Integer)
 
-    vectorPentagonal _ _ _ 0 = return ()
+    vectorPentagonal _ _ _ 0 = return 1
 
     vectorPentagonal storage pentagonal plusMinus n = do
-        vectorPentagonal storage pentagonal plusMinus (n-1)
-        dp <- mapM (MV.read storage) $ takeNbeforeWhile sqrt2Ndiv3 (>=0) $ map ((-) n) pentagonal
-        MV.write storage n $ sum $ zipWith id plusMinus dp
-      where
-        sqrt2Ndiv3 = flip (-) 1 $ floor $ sqrt $ fromIntegral $ 4*2*n `div` 3
-        takeNbeforeWhile :: Int -> (a -> Bool) -> [a] -> [a]
-        takeNbeforeWhile _ _ [] = []
-        takeNbeforeWhile 0 boolF list = takeWhile boolF list
-        takeNbeforeWhile x boolF (h:rest) = h:takeNbeforeWhile (x-1) boolF rest
+        nMinus1 <- vectorPentagonal storage pentagonal plusMinus (n-1)
+        MV.unsafeWrite storage (n-1) nMinus1
+        -- dp <- mapM (MV.unsafeRead storage) $ takeNbeforeWhile sqrt2Ndiv3 (>=0) $ map ((-) n) pentagonal
+        dp <- mapM (MV.unsafeRead storage) $ takeWhile (>=0) $ map ((-) n) pentagonal
+        return $ sum $ zipWith id plusMinus dp
+--      where
+--        sqrt2Ndiv3 = flip (-) 1 $ floor $ sqrt $ fromIntegral $ 4*2*n `div` 3
+--        takeNbeforeWhile :: Int -> (a -> Bool) -> [a] -> [a]
+--        takeNbeforeWhile _ _ [] = []
+--        takeNbeforeWhile 0 boolF list = takeWhile boolF list
+--        takeNbeforeWhile x boolF (h:rest) = h:takeNbeforeWhile (x-1) boolF rest
 
 
 
@@ -1019,9 +1020,11 @@ samelinePartitions''' n = runST $ do
 
 main :: IO ()
 main = do
-  -- A 45000 ya tira de swap, no jugarsela
-  let n = 10000
-  --let n = 1500
+  -- A 200000 el ordenador se cuelga, incluso con MV
+  -- A 45000 tira de swap con Vector u otros, no jugarsela
+  --let n = 150000
+  let n = 20000
+
   putStrLn $ (++) "n = " $ show n
 
 --  print [(headM, selected, tailM) | (headM, selected:tailM) <- [splitAt x [0..10] | x <- [0..10]]]
@@ -1031,9 +1034,9 @@ main = do
 
   let functions = init $ tail [ (\ x -> 0),
                   -- < 30000 para ejecuciones que tarden menos de 10s
-                  pentaUpdateVectorPartitions'''',
-                  pentaUpdateVectorPartitions''''',
                   pentaUpdateVectorPartitions'''''',
+                  --pentaUpdateVectorPartitions'''',
+                  --pentaUpdateVectorPartitions''''',
                   -- < 25000
                   --pentaVectorPartitions',
                   --pentaVectorPartitions,
@@ -1095,16 +1098,17 @@ main = do
 
   let readyFunctions = zipWith (map) functions
 
-  return $! force $ readyFunctions $ cycle [[n]]
-
+  let runN = readyFunctions $ cycle [[n]]
+  print $ runN
+--  print $ zipWith (flip assert) (repeat "The same value") $ zipWith (==) runN $ drop 1 runN
 
 --  https://oeis.org/A000041
   let correct = [1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627, 792, 1002, 1255, 1575, 1958, 2436, 3010, 3718, 4565, 5604, 6842, 8349, 10143, 12310, 14883, 17977, 21637, 26015, 31185, 37338, 44583, 53174, 63261, 75175, 89134, 105558, 124754, 147273, 173525]
   let len = length correct
 
---  let results = readyFunctions $ cycle [[0..len-1]]
---  print results
---  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) results $ cycle [correct]
+--  let tests = readyFunctions $ cycle [[0..len-1]]
+--  print tests
+--  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) tests $ cycle [correct]
 
   return ()
 
