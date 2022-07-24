@@ -107,7 +107,7 @@ dpPartitions buffer used free _
     --in take used buffer ++ [(buffer !! used) ++ [value]] -- ++ drop (used+1) buffer
     in insertInLastCell buffer value
   | otherwise   =
-    --let value = sum $ zipWith (!!) (take used $ drop 1 buffer) [free-1, free-2..free-used] -- sin atajo
+    --let value = sum $ zipWith (!!) (take used $ tail buffer) [free-1, free-2..free-used] -- sin atajo
     --let value = sum $ zipWith (!!) (map (buffer !!) [1..used]) [free-1, free-2..free-used] --igual que el anterior, pero mas inef.
     let value = sum $ zipWith (!!) (drop (used-1) buffer) [free, free-used] -- atajo
     --let value = sum $ zipWith (!!) (map (buffer !!) [used-1, used]) [free, free-used] --igual que el anterior, pero mas inef.
@@ -886,7 +886,7 @@ pentaUpdateVectorPartitions'' n = runST $ do
   where
     posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
     negPentagonal = zipWith (+) posPentagonal [1..]
-    pentagonal = takeWhile (<=n) $ drop 1 $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip posPentagonal negPentagonal
+    pentagonal = takeWhile (<=n) $ tail $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip posPentagonal negPentagonal
     plusMinus = cycle [id, id, negate, negate]
 
     vectorPentagonal :: (PrimMonad m) =>
@@ -975,24 +975,21 @@ pentaUpdateVectorPartitions''''' n = runST $ do
                         [Integer -> Integer] ->
                         m (Integer)
 
-    --vectorPentagonal _ _ _ 0 = return 1
-    --vectorPentagonal _ [] _ = return 1
 
     vectorPentagonal storage pentVector plusMinus
       | MV.length pentVector == 0 = return 1
       | otherwise = do
-        nMinus1 <- MV.read pentVector 0
+        nMinus1 <- MV.read pentVector 0 --(MV.length pentVector -1)
         if nMinus1 < 0 then return 1
-        else do
-            allRead <- mapM (MV.read pentVector) $ drop 1 indexList
-            mapM_ (MV.modify pentVector (flip (-) 1) ) indexList
-            pMinus1 <- vectorPentagonal storage pentVector plusMinus
-            mapM_ (MV.modify pentVector ((+) 1) ) indexList
-            MV.write storage nMinus1 pMinus1
-            dp <- mapM (MV.read storage) $ takeWhile(>=0) allRead
-            return $ sum $ zipWith id plusMinus (pMinus1:dp)
-          where
-            indexList = [0..flip (-) 1 $ MV.length pentVector]
+        else do -- XXX
+          allRead <- mapM (MV.read pentVector) $ [0.. flip (-) 1 $ MV.length pentVector]
+          let biggerThan0 = takeWhile (>=0) allRead
+          mapM_ (MV.modify pentVector (flip (-) 1) ) $ map (fst) $ zip [0..] biggerThan0
+          pMinus1 <- vectorPentagonal storage pentVector plusMinus
+          --mapM_ (MV.modify pentVector ((+) 1) ) indexList
+          MV.write storage nMinus1 pMinus1
+          dp <- mapM (MV.read storage) $ tail biggerThan0
+          return $ sum $ zipWith id plusMinus (pMinus1:dp)
 
 
 pentaModifyVectorFromTheBottomPartitions :: Int -> Integer
@@ -1188,15 +1185,15 @@ main = do
 
   let runN = readyFunctions $ cycle [[n]]
   print $ runN
-  print $ zipWith (flip assert) (repeat "The same value") $ zipWith (==) runN $ drop 1 runN
+  print $ zipWith (flip assert) (repeat "The same value") $ zipWith (==) runN $ tail runN
 
 --  https://oeis.org/A000041
   let correct = [1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627, 792, 1002, 1255, 1575, 1958, 2436, 3010, 3718, 4565, 5604, 6842, 8349, 10143, 12310, 14883, 17977, 21637, 26015, 31185, 37338, 44583, 53174, 63261, 75175, 89134, 105558, 124754, 147273, 173525]
   let len = length correct
 
---  let tests = readyFunctions $ cycle [[0..len-1]]
---  print tests
---  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) tests $ cycle [correct]
+  let tests = readyFunctions $ cycle [[0..len-1]]
+  print tests
+  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) tests $ cycle [correct]
 
   return ()
 
