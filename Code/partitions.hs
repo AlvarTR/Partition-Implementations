@@ -848,7 +848,7 @@ pentaUpdateVectorPartitions n = runST $ do
 
     vectorPentagonal storage pentagonal plusMinus n = do
       vectorPentagonal storage pentagonal plusMinus (n-1)
-      dp <- mapM (MV.read storage) $ takeWhile (>=0) $ map ((-) n) pentagonal
+      dp <- mapM (MV.read storage) $ map ((-) n) $ takeWhile (<=n) pentagonal
       MV.write storage n (sum (zipWith id plusMinus dp) )
 
 
@@ -886,7 +886,7 @@ pentaUpdateVectorPartitions'' n = runST $ do
   where
     posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
     negPentagonal = zipWith (+) posPentagonal [1..]
-    pentagonal = takeWhile (<=n) $ tail $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip posPentagonal negPentagonal
+    pentagonal = takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip negPentagonal $ tail posPentagonal
     plusMinus = cycle [id, id, negate, negate]
 
     vectorPentagonal :: (PrimMonad m) =>
@@ -928,7 +928,7 @@ pentaUpdateVectorPartitions''' n = runST $ do
       let optPent = if h > n then rest else pentagonal
       pMinus1 <- vectorPentagonal storage optPent plusMinus (n-1)
       MV.unsafeWrite storage (n-1) pMinus1
-      dp <- mapM (MV.unsafeRead storage) $ reverse $ map ((-) n) optPent
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ reverse optPent
       return $ sum $ zipWith id plusMinus (pMinus1:dp)
 
 pentaUpdateVectorPartitions'''' :: Int -> Integer -- Substractions and reverses ftw
@@ -955,7 +955,7 @@ pentaUpdateVectorPartitions'''' n = runST $ do
       let optPent = if h > n then rest else pentagonal
       pMinus1 <- vectorPentagonal storage ((n-1):optPent) plusMinus
       MV.unsafeWrite storage (n-1) pMinus1
-      dp <- mapM (MV.unsafeRead storage) $ reverse $ map ((-) n) optPent
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ reverse optPent
       return $ sum $ zipWith id plusMinus (pMinus1:dp)
 
 pentaUpdateVectorPartitions''''' :: Int -> Integer -- Substractions and reverses ftw
@@ -992,7 +992,7 @@ pentaUpdateVectorPartitions'''''' n = runST $ do
     --sqrtN = ceiling $ sqrt $ fromIntegral n
     posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
     negPentagonal = zipWith (+) posPentagonal [1..]
-    pentagonal = takeWhile (>=0) $ foldr (\ (x,y) xs -> (n-x):(n-y):xs) [] $ zip posPentagonal negPentagonal
+    pentagonal = map ((-) n) $ takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip posPentagonal negPentagonal
     plusMinus = cycle [id, id, negate, negate]
 
     vectorPentagonal :: (PrimMonad m) =>
@@ -1009,6 +1009,97 @@ pentaUpdateVectorPartitions'''''' n = runST $ do
       MV.unsafeWrite storage nMinus1 pMinus1
       dp <- mapM (MV.unsafeRead storage) rest
       return $ sum $ zipWith id plusMinus (pMinus1:dp)
+
+pentaUpdateVectorPartitions''''''' :: Int -> Integer -- The closest to a pure for loop
+pentaUpdateVectorPartitions''''''' n = runST $ do
+    storage <- MV.new (n+1)
+    mapM (vectorPentagonal storage pentagonal plusMinus) [0..n]
+    MV.read storage n
+  where
+    --sqrtN = ceiling $ sqrt $ fromIntegral n
+    posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
+    negPentagonal = zipWith (+) posPentagonal [1..]
+    pentagonal = foldr (\ (x,y) xs -> x:y:xs) [] $ zip posPentagonal negPentagonal
+    plusMinus = cycle [id, id, negate, negate]
+
+    vectorPentagonal :: (PrimMonad m) =>
+                        MV.MVector (PrimState m) Integer ->
+                        [Int] ->
+                        [Integer -> Integer] ->
+                        Int ->
+                        m ()
+
+    --vectorPentagonal _ _ _ 0 = return 1
+    vectorPentagonal storage _ _ 0 = MV.unsafeWrite storage 0 (1 :: Integer)
+
+    vectorPentagonal storage pentagonal plusMinus n = do
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ takeWhile (<=n) pentagonal
+      MV.unsafeWrite storage n $ sum $ zipWith id plusMinus dp
+
+pentaUpdateVectorPartitions'''''''' :: Int -> Integer -- Tail recursion
+pentaUpdateVectorPartitions'''''''' n = runST $ do
+    storage <- MV.new n
+    vectorPentagonal storage pentagonal plusMinus 1 [1..n]
+  where
+    --sqrtN = ceiling $ sqrt $ fromIntegral n
+    posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
+    negPentagonal = zipWith (+) posPentagonal [1..]
+    pentagonal = takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip negPentagonal $ tail posPentagonal
+    plusMinus = cycle [id, id, negate, negate]
+
+    vectorPentagonal :: (PrimMonad m) =>
+                        MV.MVector (PrimState m) Integer ->
+                        [Int] ->
+                        [Integer -> Integer] ->
+                        Integer -> [Int] ->
+                        m (Integer)
+
+    --vectorPentagonal _ _ _ 0 = return 1
+    vectorPentagonal _ _ _ p [] = return p
+
+    vectorPentagonal storage pentagonal plusMinus pMinus1 (n:rest) = do
+      MV.unsafeWrite storage (n-1) pMinus1
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ takeWhile (<=n) pentagonal
+      vectorPentagonal storage pentagonal plusMinus (sum $ zipWith id plusMinus (pMinus1:dp)) rest
+
+
+pentaZipperUpdateVectorPartitions :: Int -> Integer -- Tail recursion with zipper
+pentaZipperUpdateVectorPartitions n = runST $ do
+    storage <- MV.new n
+    vectorPentagonal storage (pentagonal, []) plusMinus 1 [1..n]
+  where
+    --sqrtN = ceiling $ sqrt $ fromIntegral n
+    posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
+    negPentagonal = zipWith (+) posPentagonal [1..]
+    pentagonal = takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip negPentagonal $ tail posPentagonal
+    plusMinus = cycle [id, id, negate, negate]
+
+    vectorPentagonal :: (PrimMonad m) =>
+                        MV.MVector (PrimState m) Integer ->
+                        ([Int], [Int]) ->
+                        [Integer -> Integer] ->
+                        Integer -> [Int] ->
+                        m (Integer)
+
+    --vectorPentagonal _ _ _ 0 = return 1
+    vectorPentagonal _ _ _ p [] = return p
+
+    vectorPentagonal storage t@([], zipper) plusMinus pMinus1 (n:ns) = do
+      MV.unsafeWrite storage (n-1) pMinus1
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) zipper -- Already reversed
+      vectorPentagonal storage t plusMinus (sum $ zipWith id plusMinus (pMinus1:dp)) ns
+
+    vectorPentagonal storage t@(p:[], zipper) plusMinus pMinus1 (n:ns) = do
+      MV.unsafeWrite storage (n-1) pMinus1
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ reverse zipper
+      let processedPent = if p == (n+1) then ([], reverse $ p:zipper) else t -- Diff
+      vectorPentagonal storage processedPent plusMinus (sum $ zipWith id plusMinus (pMinus1:dp)) ns
+
+    vectorPentagonal storage t@(p:ps, zipper) plusMinus pMinus1 (n:ns) = do
+      MV.unsafeWrite storage (n-1) pMinus1
+      dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ reverse zipper
+      let processedPent = if p == (n+1) then (ps, p:zipper) else t -- Diff
+      vectorPentagonal storage processedPent plusMinus (sum $ zipWith id plusMinus (pMinus1:dp)) ns
 
 
 pentaDoubleUpdateVectorPartitions :: Int -> Integer
@@ -1173,11 +1264,14 @@ main = do
                   -- < 30000 para ejecuciones que tarden menos de 10s
                   pentaUpdateVectorPartitions''',
                   pentaUpdateVectorPartitions'''',
-                  pentaUpdateVectorPartitions''''',
-                  pentaUpdateVectorPartitions'',
-                  pentaUpdateVectorPartitions,
-                  pentaUpdateVectorPartitions',
-                  pentaUpdateVectorPartitions'''''',
+                  pentaZipperUpdateVectorPartitions,
+                  --pentaUpdateVectorPartitions''''',
+                  --pentaUpdateVectorPartitions'',
+                  --pentaUpdateVectorPartitions'''''''',
+                  --pentaUpdateVectorPartitions''''''',
+                  --pentaUpdateVectorPartitions,
+                  --pentaUpdateVectorPartitions',
+                  --pentaUpdateVectorPartitions'''''',
                   --pentaDoubleUpdateVectorPartitions,
                   -- < 25000
                   --pentaVectorPartitions',
