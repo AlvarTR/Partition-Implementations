@@ -1036,6 +1036,7 @@ pentaUpdateVectorPartitions''''''' n = runST $ do
       dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ takeWhile (<=n) pentagonal
       MV.unsafeWrite storage n $ sum $ zipWith id plusMinus dp
 
+
 pentaUpdateVectorPartitions'''''''' :: Int -> Integer -- Tail recursion
 pentaUpdateVectorPartitions'''''''' n = runST $ do
     storage <- MV.new n
@@ -1060,7 +1061,9 @@ pentaUpdateVectorPartitions'''''''' n = runST $ do
     vectorPentagonal storage pentagonal plusMinus pMinus1 (n:rest) = do
       MV.unsafeWrite storage (n-1) pMinus1
       dp <- mapM (MV.unsafeRead storage) $ map ((-) n) $ takeWhile (<=n) pentagonal
-      vectorPentagonal storage pentagonal plusMinus (sum $ zipWith id plusMinus (pMinus1:dp)) rest
+      --let p = sum $ zipWith (\ x i -> (plusMinus!!i) x ) (pMinus1:dp) $ cycle [0..3]
+      let p = sum $ zipWith id plusMinus (pMinus1:dp)
+      vectorPentagonal storage pentagonal plusMinus p rest
 
 
 pentaZipperUpdateVectorPartitions :: Int -> Integer -- Tail recursion with zipper
@@ -1201,6 +1204,30 @@ pentaDoubleUpdateVectorPartitions n = runST $ do
           dp <- mapM (MV.read storage) $ tail biggerThan0
           return $ sum $ zipWith id plusMinus (pMinus1:dp)
 
+pentaDoubleUpdateVectorPartitions' :: Int -> Integer -- return desired value, instead of writing and reading it
+pentaDoubleUpdateVectorPartitions' n = runST $ do
+    storage <- MV.new n
+    vectorPentagonal storage pentagonal plusMinus n
+  where
+    posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
+    negPentagonal = zipWith (+) posPentagonal [1..]
+    pentagonal = takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip negPentagonal $ tail posPentagonal
+    plusMinus = V.fromList [id, id, negate, negate]
+
+    vectorPentagonal :: (PrimMonad m) =>
+                        MV.MVector (PrimState m) Integer ->
+                        [Int] ->
+                        V.Vector (Integer -> Integer) ->
+                        Int ->
+                        m (Integer)
+
+    vectorPentagonal _ _ _ 0 = return 1
+
+    vectorPentagonal storage pentagonal plusMinus n = do
+      pMinus1 <- vectorPentagonal storage pentagonal plusMinus (n-1)
+      MV.unsafeWrite storage (n-1) pMinus1
+      dp <- mapM (MV.unsafeRead storage) $ takeWhile (>=0) $ map ((-) n) pentagonal
+      return $ sum $ zipWith ( \ x i -> ((V.!) plusMinus i) x ) (pMinus1:dp) $ cycle [0..3]
 
 pentaModifyVectorFromTheBottomPartitions :: Int -> Integer
 pentaModifyVectorFromTheBottomPartitions n = V.last $ vectorPentagonal pentagonal n n
@@ -1327,17 +1354,18 @@ main = do
   let functions = init $ tail [ (\ x -> 0),
                   -- < 30000 para ejecuciones que tarden menos de 10s
                   --pentaUpdateVectorPartitions''',
-                  pentaUpdateVectorPartitions'''',
-                  pentaZipperUpdateVectorPartitions'',
-                  pentaZipperUpdateVectorPartitions',
+                  --pentaUpdateVectorPartitions'''',
+                  --pentaZipperUpdateVectorPartitions'',
+                  --pentaZipperUpdateVectorPartitions',
                   --pentaZipperUpdateVectorPartitions,
                   --pentaUpdateVectorPartitions''''',
-                  --pentaUpdateVectorPartitions'',
+                  pentaUpdateVectorPartitions'',
                   --pentaUpdateVectorPartitions'''''''',
                   --pentaUpdateVectorPartitions''''''',
                   --pentaUpdateVectorPartitions,
                   --pentaUpdateVectorPartitions',
                   --pentaUpdateVectorPartitions'''''',
+                  pentaDoubleUpdateVectorPartitions',
                   --pentaDoubleUpdateVectorPartitions,
                   -- < 25000
                   --pentaVectorPartitions',
