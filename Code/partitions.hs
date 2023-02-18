@@ -7,17 +7,19 @@ import           Control.Parallel.Strategies
 
 import           Data.List
 import           Data.Maybe
-import qualified Data.Foldable               as F
+import qualified Data.Foldable                as F
 
 --https://hackage.haskell.org/package/vector
-import qualified Data.Vector                 as V
+import qualified Data.Vector                  as V
 -- www.fpcomplete.com/haskell/library/vector/
-import qualified Data.Vector.Mutable         as MV
-import qualified Data.Vector.Generic         as GV
-
+import qualified Data.Vector.Mutable          as MV
+import qualified Data.Vector.Generic          as GV
 
 --import qualified Data.Vector.Unboxed as UB
 --import qualified Data.Vector.Storable as SV
+
+import qualified Data.Array.MArray            as MA
+import qualified Data.Array                   as A
 
 import           Control.Monad.Primitive
 import           Control.Monad.ST
@@ -1336,13 +1338,68 @@ samelinePartitions''' n = runST $ do
         --imapM_ f v = forI_ v (\ i -> f i)
 
 
+-- https://www.haskell.org/tutorial/arrays.html
+pentaArrayPartitions :: Int -> Integer -- Adapting pentaUpdateVectorPartitions''
+
+pentaArrayPartitions n = pentaArray A.! n
+  where
+    pentaArray = A.array (0, n) (
+                                  [ (0, 1::Integer) ] ++
+                                  [ (i, arrayPentagonal pentaArray pentagonal plusMinus i) | i <- [1..n] ]
+                                )
+    posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
+    negPentagonal = zipWith (+) posPentagonal [1..]
+    pentagonal = takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip negPentagonal $ tail posPentagonal
+    plusMinus = cycle [id, id, negate, negate]
+
+    arrayPentagonal :: A.Array Int Integer ->
+                       [Int] ->
+                       [Integer -> Integer] ->
+                       Int ->
+                       Integer
+
+    arrayPentagonal storage pentagonal plusMinus n = sum $ zipWith id plusMinus (pMinus1:dp)
+      where
+        pMinus1 = storage A.! (n-1)
+        dp = map ((A.!) storage) $ takeWhile (>=0) $ map ((-) n) pentagonal
+
+
+pentaArrayPartitions' :: Int -> Integer -- Adapting pentaUpdateVectorPartitions'''
+
+pentaArrayPartitions' n = pentaArray A.! n
+  where
+    pentaArray = A.array (0, n) (
+                                  [ (0, 1::Integer) ] ++
+                                  [ (i, arrayPentagonal pentaArray pentagonal plusMinus i) | i <- [1..n] ]
+                                )
+
+    posPentagonal = 1 : [x+1 + i+i+i | (i, x) <- zip [1..] posPentagonal]
+    negPentagonal = zipWith (+) posPentagonal [1..]
+    pentagonal = reverse $ takeWhile (<=n) $ foldr (\ (x,y) xs -> x:y:xs) [] $ zip negPentagonal $ tail posPentagonal
+    plusMinus = cycle [id, id, negate, negate]
+
+    arrayPentagonal :: A.Array Int Integer ->
+                       [Int] ->
+                       [Integer -> Integer] ->
+                       Int ->
+                       Integer
+
+    arrayPentagonal _ [] _ _= 1::Integer
+
+    arrayPentagonal storage pentagonal@(h:rest) plusMinus n = sum $ zipWith id plusMinus (pMinus1:dp)
+      where
+        -- optPent = if h > n then rest else pentagonal
+        optPent = dropWhile (>n) pentagonal
+        pMinus1 = storage A.! (n-1)
+        dp = map ((A.!) storage) $ map ((-) n) $ reverse optPent
+
 
 main :: IO ()
 main = do
   -- A 200000 el ordenador se cuelga, incluso con MV
   -- A 45000 tira de swap con Vector u otros, no jugarsela
   --let n = 150000
-  let n = 10000
+  let n = 40000
 
   putStrLn $ (++) "n = " $ show n
 
@@ -1352,6 +1409,9 @@ main = do
 --  print $ map (bufferPartitions'') [0..n]
 
   let functions = init $ tail [ (\ x -> 0),
+                  -- < 40000 para ejecuciones que tarden menos de 10s
+                  --pentaArrayPartitions',
+                  pentaArrayPartitions,
                   -- < 30000 para ejecuciones que tarden menos de 10s
                   --pentaUpdateVectorPartitions''',
                   --pentaUpdateVectorPartitions'''',
@@ -1359,13 +1419,13 @@ main = do
                   --pentaZipperUpdateVectorPartitions',
                   --pentaZipperUpdateVectorPartitions,
                   --pentaUpdateVectorPartitions''''',
-                  pentaUpdateVectorPartitions'',
+                  --pentaUpdateVectorPartitions'',
                   --pentaUpdateVectorPartitions'''''''',
                   --pentaUpdateVectorPartitions''''''',
                   --pentaUpdateVectorPartitions,
                   --pentaUpdateVectorPartitions',
                   --pentaUpdateVectorPartitions'''''',
-                  pentaDoubleUpdateVectorPartitions',
+                  --pentaDoubleUpdateVectorPartitions',
                   --pentaDoubleUpdateVectorPartitions,
                   -- < 25000
                   --pentaVectorPartitions',
@@ -1433,12 +1493,12 @@ main = do
   print $ zipWith (flip assert) (repeat "The same value") $ zipWith (==) runN $ tail runN
 
 --  https://oeis.org/A000041
-  let correct = [1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627, 792, 1002, 1255, 1575, 1958, 2436, 3010, 3718, 4565, 5604, 6842, 8349, 10143, 12310, 14883, 17977, 21637, 26015, 31185, 37338, 44583, 53174, 63261, 75175, 89134, 105558, 124754, 147273, 173525]
-  let len = length correct
+  -- let correct = [1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627, 792, 1002, 1255, 1575, 1958, 2436, 3010, 3718, 4565, 5604, 6842, 8349, 10143, 12310, 14883, 17977, 21637, 26015, 31185, 37338, 44583, 53174, 63261, 75175, 89134, 105558, 124754, 147273, 173525]
+  -- let len = length correct
 
---  let tests = readyFunctions $ cycle [[0..len-1]]
---  print tests
---  print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) tests $ cycle [correct]
+  -- let tests = readyFunctions $ cycle [[0..len-1]]
+  -- print tests
+  -- print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) tests $ cycle [correct]
 
   return ()
 
