@@ -4,3 +4,4 @@ partitions
 *.hi
 *.o
 *.prof
+dist-newstyle/

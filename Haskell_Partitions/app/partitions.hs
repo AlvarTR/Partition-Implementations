@@ -13,14 +13,14 @@ import Control.Exception
 import Control.Monad.Primitive
 import Control.Monad.ST
 import Control.Parallel.Strategies
-import Data.Array qualified as A
-import Data.Array.MArray qualified as MA
-import Data.Foldable qualified as F
 import Data.List
 import Data.Maybe
-import Data.Vector qualified as V
-import Data.Vector.Generic qualified as GV
-import Data.Vector.Mutable qualified as MV
+import qualified Data.Array as A
+import qualified Data.Array.MArray as MA
+import qualified Data.Foldable as F
+import qualified Data.Vector as V
+import qualified Data.Vector.Generic as GV
+import qualified Data.Vector.Mutable as MV
 
 -- import Data.STRef
 
@@ -1383,7 +1383,7 @@ main = do
           tail
             [ const 0,
               -- < 40000 para ejecuciones que tarden menos de 10s
-              -- pentaArrayPartitions',
+              pentaArrayPartitions',
               pentaArrayPartitions,
               -- < 30000 para ejecuciones que tarden menos de 10s
               -- pentaUpdateVectorPartitions''',
@@ -1463,8 +1463,8 @@ main = do
   let readyFunctions = zipWith map functions
 
   let runN = readyFunctions $ repeat [n]
-  print runN
-  print $ map (flip assert "The same value") $ zipWith (==) runN $ tail runN
+  mapM_ print runN
+  print $ map (`assert` "The same value") $ zipWith (==) runN $ tail runN
 
   --  https://oeis.org/A000041
   -- let correct = [1, 1, 2, 3, 5, 7, 11, 15, 22, 30, 42, 56, 77, 101, 135, 176, 231, 297, 385, 490, 627, 792, 1002, 1255, 1575, 1958, 2436, 3010, 3718, 4565, 5604, 6842, 8349, 10143, 12310, 14883, 17977, 21637, 26015, 31185, 37338, 44583, 53174, 63261, 75175, 89134, 105558, 124754, 147273, 173525]
@@ -1474,7 +1474,7 @@ main = do
   -- print tests
   -- print $ zipWith (flip assert) (repeat "OK") $ zipWith (==) tests $ cycle [correct]
 
-  return ()
+  print ""
 
 -- DEPRECATED
 --  return $! descendingPartitions n
